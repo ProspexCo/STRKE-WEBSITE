@@ -31,7 +31,7 @@ async function startServer() {
 
 app.options("*", cors());
 app.use(express.json());
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Stripe Webhook needs raw body for signature verification
   app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
