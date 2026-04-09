@@ -19,12 +19,26 @@ const resend = new Resend(process.env.RESEND_API_KEY || "");
 async function startServer() {
   const app = express();
   app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://strke-website.vercel.app",
-    "https://strke-website-n025monnu-prospexcos-projects.vercel.app",
-    "https://strke-website-production-564c.up.railway.app",
-  ],
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const allowedOrigins = [
+      "http://localhost:5173",
+      "https://strke-website.vercel.app",
+      "https://strke-website-production-564c.up.railway.app",
+    ];
+
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith(".vercel.app")
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
 }));
