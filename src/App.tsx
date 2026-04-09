@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import {
   Dumbbell,
   Flame,
@@ -25,7 +26,7 @@ type Program = {
   id: string;
   title: string;
   price: number;
-  icon?: JSX.Element;
+  icon?: ReactNode;
   description?: string;
   features?: string[];
   programLink: string;

@@ -5,6 +5,8 @@ import { fileURLToPath } from "url";
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import { Resend } from "resend";
+import cors from "cors";
+
 
 dotenv.config();
 
@@ -16,6 +18,19 @@ const resend = new Resend(process.env.RESEND_API_KEY || "");
 
 async function startServer() {
   const app = express();
+  app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://strke-website.vercel.app",
+    "https://strke-website-7ek7ka23y-prospexcos-projects.vercel.app",
+    "https://strke-website-production.up.railway.app",
+  ],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+}));
+
+app.options("*", cors());
+app.use(express.json());
   const PORT = 3000;
 
   // Stripe Webhook needs raw body for signature verification
