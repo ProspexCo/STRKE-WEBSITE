@@ -94,7 +94,7 @@ export default function App() {
   const handlePurchase = async (program: typeof programs[0]) => {
     try {
       setLoading(program.id);
-      const response = await fetch("/api/create-checkout-session", {
+      const response = await fetch("https://strke-website-production.up.railway.app/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
