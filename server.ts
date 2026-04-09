@@ -7,105 +7,141 @@ import dotenv from "dotenv";
 import { Resend } from "resend";
 import cors from "cors";
 
-
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.warn("STRIPE_SECRET_KEY is not set");
+}
+if (!process.env.RESEND_API_KEY) {
+  console.warn("RESEND_API_KEY is not set");
+}
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 const resend = new Resend(process.env.RESEND_API_KEY || "");
 
 async function startServer() {
   const app = express();
-  app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "https://strke-website.vercel.app",
-      "https://strke-website-production-564c.up.railway.app",
-    ];
-
-    if (
-      allowedOrigins.includes(origin) ||
-      origin.endsWith(".vercel.app")
-    ) {
-      return callback(null, true);
-    }
-
-    return callback(new Error(`Not allowed by CORS: ${origin}`));
-  },
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
-}));
-
-app.use(express.json());
   const PORT = Number(process.env.PORT) || 3000;
 
-  // Stripe Webhook needs raw body for signature verification
-  app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-    const sig = req.headers["stripe-signature"] as string;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    let event;
-
-    try {
-      if (!sig || !webhookSecret) {
-        throw new Error("Missing signature or webhook secret");
-      }
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err: any) {
-      console.error(`Webhook Error: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const customerEmail = session.customer_details?.email;
-      const programTitle = session.metadata?.programTitle;
-      const programLink = session.metadata?.programLink;
-
-      if (customerEmail && programLink) {
-        try {
-          await resend.emails.send({
-            from: "Nick Eunson <onboarding@resend.dev>", // Replace with your verified domain
-            to: customerEmail,
-            subject: `Your Program: ${programTitle}`,
-            html: `
-              <h1>Thanks for your purchase!</h1>
-              <p>You've successfully purchased the <strong>${programTitle}</strong>.</p>
-              <p>You can access your program here:</p>
-              <a href="${programLink}" style="display: inline-block; padding: 12px 24px; background-color: #f97316; color: white; text-decoration: none; border-radius: 9999px; font-weight: bold;">Access Program</a>
-              <p>If you have any questions, just reply to this email.</p>
-              <p>- Nick Eunson</p>
-            `,
-          });
-          console.log(`Email sent to ${customerEmail} for ${programTitle}`);
-        } catch (emailError) {
-          console.error("Error sending email:", emailError);
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin) {
+          return callback(null, true);
         }
-      }
-    }
 
-    res.json({ received: true });
+        const allowedOrigins = [
+          "http://localhost:5173",
+          "https://strke-website.vercel.app",
+          "https://strke-website-production-564c.up.railway.app",
+        ];
+
+        if (
+          allowedOrigins.includes(origin) ||
+          origin.endsWith(".vercel.app")
+        ) {
+          return callback(null, true);
+        }
+
+        return callback(new Error(`Not allowed by CORS: ${origin}`));
+      },
+      methods: ["GET", "POST", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "stripe-signature"],
+    })
+  );
+
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
   });
 
+  // Stripe webhook must come BEFORE express.json() because it needs the raw body
+  app.post(
+    "/api/webhook",
+    express.raw({ type: "application/json" }),
+    async (req, res) => {
+      const sig = req.headers["stripe-signature"] as string | undefined;
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+      try {
+        if (!sig || !webhookSecret) {
+          return res
+            .status(400)
+            .send("Missing stripe-signature header or STRIPE_WEBHOOK_SECRET");
+        }
+
+        const event = stripe.webhooks.constructEvent(
+          req.body,
+          sig,
+          webhookSecret
+        );
+
+        if (event.type === "checkout.session.completed") {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const customerEmail = session.customer_details?.email;
+          const programTitle = session.metadata?.programTitle;
+          const programLink = session.metadata?.programLink;
+
+          if (customerEmail && programLink) {
+            try {
+              await resend.emails.send({
+                from: "Nick Eunson <onboarding@resend.dev>",
+                to: customerEmail,
+                subject: `Your Program: ${programTitle || "Purchase"}`,
+                html: `
+                  <h1>Thanks for your purchase!</h1>
+                  <p>You've successfully purchased the <strong>${programTitle || "program"}</strong>.</p>
+                  <p>You can access your program here:</p>
+                  <a href="${programLink}" style="display:inline-block;padding:12px 24px;background-color:#f97316;color:white;text-decoration:none;border-radius:9999px;font-weight:bold;">Access Program</a>
+                  <p>If you have any questions, just reply to this email.</p>
+                  <p>- Nick Eunson</p>
+                `,
+              });
+              console.log(`Email sent to ${customerEmail} for ${programTitle}`);
+            } catch (emailError) {
+              console.error("Error sending email:", emailError);
+            }
+          }
+        }
+
+        return res.json({ received: true });
+      } catch (err: any) {
+        console.error("Webhook Error:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    }
+  );
+
+  // JSON parser for normal API routes
   app.use(express.json());
 
-  // API Route for Stripe Checkout
   app.post("/api/create-checkout-session", async (req, res) => {
-    console.log("Creating checkout session for:", req.body.programTitle);
     try {
-      const { programId, programTitle, price, programLink } = req.body;
+      const { programId, programTitle, price, programLink } = req.body ?? {};
+
+      console.log("Creating checkout session for:", programTitle);
 
       if (!process.env.STRIPE_SECRET_KEY) {
-        console.error("Stripe secret key missing");
-        return res.status(500).json({ error: "Stripe secret key not configured" });
+        return res
+          .status(500)
+          .json({ error: "Stripe secret key not configured" });
       }
+
+      if (
+        !programId ||
+        !programTitle ||
+        typeof price !== "number" ||
+        !programLink
+      ) {
+        return res.status(400).json({ error: "Missing or invalid fields" });
+      }
+
+      const origin =
+        typeof req.headers.origin === "string" && req.headers.origin.length > 0
+          ? req.headers.origin
+          : "https://strke-website.vercel.app";
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
@@ -118,30 +154,35 @@ app.use(express.json());
                 name: programTitle,
                 description: `12-Week ${programTitle}`,
               },
-              unit_amount: Math.round(price * 100), // Stripe expects cents
+              unit_amount: Math.round(price * 100),
             },
             quantity: 1,
           },
         ],
         mode: "payment",
-        success_url: `${req.headers.origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.headers.origin}/?canceled=true`,
+        success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/?canceled=true`,
         metadata: {
-          programId,
-          programTitle,
-          programLink,
+          programId: String(programId),
+          programTitle: String(programTitle),
+          programLink: String(programLink),
         },
       });
 
       console.log("Checkout session created:", session.id);
-      res.json({ id: session.id, url: session.url });
+
+      return res.json({
+        id: session.id,
+        url: session.url,
+      });
     } catch (error: any) {
       console.error("Stripe error:", error);
-      res.status(500).json({ error: error.message });
+      return res.status(500).json({
+        error: error?.message || "Failed to create checkout session",
+      });
     }
   });
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -151,7 +192,7 @@ app.use(express.json());
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
@@ -161,4 +202,7 @@ app.use(express.json());
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});
