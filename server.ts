@@ -22,14 +22,13 @@ async function startServer() {
   origin: [
     "http://localhost:5173",
     "https://strke-website.vercel.app",
-    "https://strke-website-7ek7ka23y-prospexcos-projects.vercel.app",
-    "https://strke-website-production.up.railway.app",
+    "https://strke-website-n025monnu-prospexcos-projects.vercel.app",
+    "https://strke-website-production-564c.up.railway.app",
   ],
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
 }));
 
-app.options("*", cors());
 app.use(express.json());
   const PORT = Number(process.env.PORT) || 3000;
 
