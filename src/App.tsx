@@ -33,7 +33,7 @@ type Program = {
   originalPrice?: number;
 };
 
-const API_URL = "https://strke-website-production-564c.up.railway.app";
+const API_URL = "https://strke-website-production-cea0.up.railway.app";
 
 const programs: Program[] = [
   {
