@@ -119,6 +119,7 @@ app.post(
 app.use(express.json());
 
 app.post("/api/create-checkout-session", async (req, res) => {
+  const origin = req.headers.origin || "http://localhost:3000";
   try {
     const stripe = getStripe();
     const { programId, programTitle, price, programLink } = req.body ?? {};
