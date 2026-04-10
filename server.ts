@@ -33,20 +33,10 @@ function getResend(): Resend | null {
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-
-      if (
-        ALLOWED_ORIGINS.includes(origin) ||
-        origin.endsWith(".vercel.app")
-      ) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`Not allowed by CORS: ${origin}`));
-    },
+    origin: true,
+    credentials: true,
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "stripe-signature"],
+    allowedHeaders: ["Content-Type", "Authorization", "stripe-signature"],
   })
 );
 
@@ -62,7 +52,6 @@ app.get("/api/health", (_req, res) => {
   res.status(200).json({ ok: true, port: PORT });
 });
 
-// Stripe webhook must come BEFORE express.json()
 app.post(
   "/api/webhook",
   express.raw({ type: "application/json" }),
@@ -108,14 +97,14 @@ app.post(
               <p>- Nick Eunson</p>
             `,
           });
-          console.log(\`Email sent to \${customerEmail} for \${programTitle}\`);
+          console.log(`Email sent to ${customerEmail} for ${programTitle}`);
         }
       }
 
       return res.json({ received: true });
     } catch (err: any) {
       console.error("Webhook error:", err);
-      return res.status(400).send(\`Webhook Error: \${err.message}\`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
   }
 );
@@ -139,7 +128,8 @@ app.post("/api/create-checkout-session", async (req, res) => {
     }
 
     const origin =
-      typeof req.headers.origin === "string" && req.headers.origin.length > 0
+      typeof req.headers.origin === "string" &&
+      ALLOWED_ORIGINS.includes(req.headers.origin)
         ? req.headers.origin
         : FRONTEND_FALLBACK;
 
@@ -154,7 +144,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
             currency: "usd",
             product_data: {
               name: programTitle,
-              description: \`12-Week \${programTitle}\`,
+              description: `12-Week ${programTitle}`,
             },
             unit_amount: Math.round(price * 100),
           },
@@ -162,8 +152,8 @@ app.post("/api/create-checkout-session", async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: \`\${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}\`,
-      cancel_url: \`\${origin}/?canceled=true\`,
+      success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/?canceled=true`,
       metadata: {
         programId: String(programId),
         programTitle: String(programTitle),
@@ -188,5 +178,5 @@ app.use("/api", (_req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(\`Server running on http://localhost:\${PORT}\`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
