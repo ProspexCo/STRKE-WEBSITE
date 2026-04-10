@@ -8,8 +8,14 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 8080;
-const FRONTEND_FALLBACK = "https://strke-website.vercel.app";
-const RAILWAY_URL = "https://strke-website-production-564c.up.railway.app";
+
+const FRONTEND_FALLBACK = "https://strke.app";
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "https://strke.app",
+  "https://strke-website.vercel.app",
+  "https://strke-website-production-cea0.up.railway.app",
+];
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -31,9 +37,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       if (
-        origin === "http://localhost:5173" ||
-        origin === FRONTEND_FALLBACK ||
-        origin === RAILWAY_URL ||
+        ALLOWED_ORIGINS.includes(origin) ||
         origin.endsWith(".vercel.app")
       ) {
         return callback(null, true);
@@ -45,13 +49,6 @@ app.use(
     allowedHeaders: ["Content-Type", "stripe-signature"],
   })
 );
-
-app.options("*", (req, res) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.sendStatus(200);
-});
 
 app.get("/", (_req, res) => {
   res.status(200).json({
@@ -111,14 +108,14 @@ app.post(
               <p>- Nick Eunson</p>
             `,
           });
-          console.log(`Email sent to ${customerEmail} for ${programTitle}`);
+          console.log(\`Email sent to \${customerEmail} for \${programTitle}\`);
         }
       }
 
       return res.json({ received: true });
     } catch (err: any) {
       console.error("Webhook error:", err);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+      return res.status(400).send(\`Webhook Error: \${err.message}\`);
     }
   }
 );
@@ -126,7 +123,6 @@ app.post(
 app.use(express.json());
 
 app.post("/api/create-checkout-session", async (req, res) => {
-  const origin = req.headers.origin || "http://localhost:3000";
   try {
     const stripe = getStripe();
     const { programId, programTitle, price, programLink } = req.body ?? {};
@@ -158,7 +154,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
             currency: "usd",
             product_data: {
               name: programTitle,
-              description: `12-Week ${programTitle}`,
+              description: \`12-Week \${programTitle}\`,
             },
             unit_amount: Math.round(price * 100),
           },
@@ -166,8 +162,8 @@ app.post("/api/create-checkout-session", async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/?canceled=true`,
+      success_url: \`\${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}\`,
+      cancel_url: \`\${origin}/?canceled=true\`,
       metadata: {
         programId: String(programId),
         programTitle: String(programTitle),
@@ -192,5 +188,5 @@ app.use("/api", (_req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(\`Server running on http://localhost:\${PORT}\`);
 });
