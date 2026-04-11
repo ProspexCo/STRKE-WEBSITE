@@ -231,7 +231,7 @@ export default function App() {
 
       <nav className="fixed top-0 z-50 w-full border-b border-black/5 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <div className="text-xl font-bold tracking-tighter uppercase">Nick Eunson</div>
+          <div className="text-xl font-bold tracking-tighter uppercase">STRKE</div>
           <div className="hidden items-center gap-8 text-sm font-medium uppercase tracking-wider md:flex">
             <a href="#story" className="transition-colors hover:text-orange-600">
               My Story
